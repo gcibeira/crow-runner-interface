@@ -1,5 +1,5 @@
-﻿.vscode/
-.clang-format
+﻿.clang-format
+.vscode/
 build/
 *.exe
 *.o
