@@ -10,6 +10,15 @@
 uint8_t buffer[BUFFER_SIZE];
 uint16_t buffer_index = 0;
 
+void process_frame(uint8_t *frame, size_t len) {
+    // Procesar la trama finalizada (optimizable según requerimientos)
+    printf("Procesando trama de longitud %zu:\n", len);
+    for (size_t i = 0; i < len; i++) {
+        printf("%02X ", frame[i]);
+    }
+    printf("\n");
+}
+
 void spi_isr(uint8_t spi_data) {
   static uint16_t bit_buffer = 0;      // Acumula bits válidos
   static uint8_t bits_in_buffer = 0;   // Cantidad de bits acumulados
@@ -31,8 +40,13 @@ void spi_isr(uint8_t spi_data) {
     } else {
       if (consecutive_ones == 6) {
         // Se ha detectado un delimitador (0x7E)
-        printf("Delimitador detectado: %s\n",
-               in_frame ? "Fin de trama" : "Inicio de trama");
+        if (in_frame) {
+          printf("Fin de trama detectado\n");
+          process_frame(buffer, buffer_index);
+          buffer_index = 0; // Limpia el buffer actual
+        } else {
+          printf("Inicio de trama detectado\n");
+        }
         in_frame = !in_frame;
         bit_buffer = 0;
         bits_in_buffer = 0;
