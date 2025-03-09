@@ -1,8 +1,6 @@
-#include <stdbool.h>
-#include <stdint.h>
+#include "hdlc.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "test_data.h"
 
 #define N 3
 #define BUFFER_SIZE 256
@@ -11,12 +9,12 @@ uint8_t buffer[BUFFER_SIZE];
 uint16_t buffer_index = 0;
 
 void process_frame(uint8_t *frame, size_t len) {
-    // Procesar la trama finalizada (optimizable según requerimientos)
-    printf("Procesando trama de longitud %zu:\n", len);
-    for (size_t i = 0; i < len; i++) {
-        printf("%02X ", frame[i]);
-    }
-    printf("\n");
+  // Procesar la trama finalizada (optimizable según requerimientos)
+  printf("Procesando trama de longitud %zu: ", len);
+  for (size_t i = 0; i < len; i++) {
+    printf("%02X ", frame[i]);
+  }
+  printf("\n");
 }
 
 void spi_isr(uint8_t spi_data) {
@@ -41,11 +39,8 @@ void spi_isr(uint8_t spi_data) {
       if (consecutive_ones == 6) {
         // Se ha detectado un delimitador (0x7E)
         if (in_frame) {
-          printf("Fin de trama detectado\n");
           process_frame(buffer, buffer_index);
           buffer_index = 0; // Limpia el buffer actual
-        } else {
-          printf("Inicio de trama detectado\n");
         }
         in_frame = !in_frame;
         bit_buffer = 0;
@@ -54,7 +49,6 @@ void spi_isr(uint8_t spi_data) {
         continue;
       } else if (consecutive_ones == 5) {
         // Bit stuffed detectado: se omite este 0 y se reinicia el contador
-        printf("Bit stuffed detectado\n");
         consecutive_ones = 0;
         continue;
       } else {
@@ -67,15 +61,10 @@ void spi_isr(uint8_t spi_data) {
     }
 
     // Mientras tengamos al menos 8 bits en el bit_buffer, extraemos un byte
-    // completo
-    /*
-    TODO: Ver qué pasa con los bits del delimitador
-    */
     while (bits_in_buffer >= 8) {
       uint8_t byte = (bit_buffer >> (bits_in_buffer - 8)) & 0xFF;
       buffer[buffer_index++] = byte;
       bits_in_buffer -= 8;
-      printf("Byte extraido: %02X\n", byte);
     }
   }
 }
@@ -84,19 +73,4 @@ void simulate_spi_data(uint8_t *data, size_t len) {
   for (size_t i = 0; i < len; i++) {
     spi_isr(data[i]);
   }
-}
-
-void print_buffer() {
-  printf("Buffer reconstruido: \n");
-  for (size_t i = 0; i < buffer_index; i++) {
-    printf("%02X ", buffer[i]);
-  }
-  printf("\n");
-}
-
-int main() {
-  simulate_spi_data(test_data, test_len);
-  print_buffer();
-
-  return 0;
 }
