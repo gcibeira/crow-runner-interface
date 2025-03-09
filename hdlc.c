@@ -28,39 +28,39 @@ void spi_isr(uint8_t spi_data) {
     uint8_t bit = (spi_data >> i) & 0x01;
 
     if (bit) {
-      if (consecutive_ones < 8)
+      if (consecutive_ones < 7) {
         consecutive_ones++;
-
+      } else {
+        // 7 ones detected. Re-sync
+        in_frame = false;
+        buffer_index = 0;
+        bit_buffer = 0;
+        bits_in_buffer = 0;
+        continue;
+      }
       if (in_frame) {
         bit_buffer = (bit_buffer << 1) | 1;
         bits_in_buffer++;
       }
     } else {
       if (consecutive_ones == 6) {
-        // Se ha detectado un delimitador (0x7E)
         if (in_frame) {
           process_frame(buffer, buffer_index);
-          buffer_index = 0; // Limpia el buffer actual
+          buffer_index = 0;
         }
         in_frame = !in_frame;
         bit_buffer = 0;
         bits_in_buffer = 0;
-        consecutive_ones = 0;
-        continue;
-      } else if (consecutive_ones == 5) {
-        // Bit stuffed detectado: se omite este 0 y se reinicia el contador
-        consecutive_ones = 0;
-        continue;
-      } else {
-        consecutive_ones = 0;
+      } else if (consecutive_ones != 5) {
         if (in_frame) {
           bit_buffer = (bit_buffer << 1);
           bits_in_buffer++;
         }
       }
+      consecutive_ones = 0;
     }
 
-    // Mientras tengamos al menos 8 bits en el bit_buffer, extraemos un byte
+    // Al completar 8 bits en bitbuffer, se almacena en el buffer de salida
     while (bits_in_buffer >= 8) {
       uint8_t byte = (bit_buffer >> (bits_in_buffer - 8)) & 0xFF;
       buffer[buffer_index++] = byte;
