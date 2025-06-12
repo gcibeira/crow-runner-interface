@@ -1,0 +1,11 @@
+# Bypass menu
+d1 00 0f                        -> bypass key pressed
+1b 00 00 00 00 00 00 00 00 00   -> display bypassed zones
+14 00 01 00 00 00 80            -> Single beep
+d1 00 0f                        -> bypass key pressed
+1b 00 00 00 00 00 00 00 00 00   -> display bypassed zones
+14 00 01 00 00 00 80            -> Single beep
+d1 00 11                        -> E key pressed
+15 00 00 00 00 03               -> Exit bypass mode / display main menu
+14 00 15 00 00 00 80            -> Triple beep
+15 00 00 00 00 03               -> Exit bypass mode / display main menu

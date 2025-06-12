@@ -1,0 +1,30 @@
+# Arm and disarm sequence
+d1 00 0d                -> Arm key pressed
+11 00 01 00 00          -> Arming (countdown)
+14 00 89 00 00 01 80    -> Intermitent beeping
+
+14 00 aa 00 00 01 80    -> Beeping speeds up
+
+11 01 00 00 00          -> Armed
+14 00 04 00 00 01 80    -> Stop beeping
+
+12 00 00 10 00 00 00    -> Zone trggered
+14 00 9b 00 00 01 80    -> Beep countdown
+
+12 00 00 14 00 00 00
+14 00 9b 00 00 01 80
+
+d1 00 04
+14 00 01 00 00 01 80
+d1 00 03
+14 00 01 00 00 01 80
+14 00 aa 00 00 01 80
+d1 00 02
+14 00 01 00 00 01 80
+d1 00 01
+14 00 01 00 00 01 80
+d1 00 11
+11 00 00 00 00          -> Disarmed
+12 00 00 00 00 00 00
+14 00 15 00 00 00 80    -> Beep
+15 00 00 00 00 03       -> Normal mode

@@ -1,0 +1,22 @@
+# Installer program mode with code 1234
+# Address 10 seems to be the command to turn on/off lights
+d1 00 10                -> P key pressed
+14 00 01 00 00 00 80    -> ACK?
+d1 00 01                -> 1 key pressed
+14 00 01 00 00 00 80
+d1 00 02                -> 2 key pressed
+14 00 01 00 00 00 80
+d1 00 03                -> 3 key pressed
+14 00 01 00 00 00 80
+d1 00 04                -> 4 key pressed
+14 00 01 00 00 00 80
+d1 00 11                -> E key pressed
+15 00 02 00 00 03       -> Enter installer program mode?
+10 00 01 c3 10 00       -> Turn on Prog light
+14 00 15 00 00 00 80    -> Triple beep
+d1 00 10                -> P key pressed
+14 00 01 00 00 00 80    -> Single beep
+d1 00 11                -> E key pressed
+10 00 01 c3 00 00       -> Turn off Prog light
+14 00 15 00 00 00 80    -> Triple beep
+15 00 00 00 00 03       -> Exit installer program mode / Main menu?

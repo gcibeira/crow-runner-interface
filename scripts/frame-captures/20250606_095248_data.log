@@ -1,0 +1,38 @@
+# Arm and trigger sequence
+d1 00 0d
+11 00 01 00 00          -> Arming
+14 00 89 00 00 01 80    -> Intermitent beeping
+
+14 00 aa 00 00 01 80    -> Beeping speeds up
+
+11 01 00 00 00          -> Armed
+14 00 04 00 00 01 80    -> Stop beeping
+
+12 00 00 10 00 00 00    -> Zone triggered
+14 00 9b 00 00 01 80    -> Intermitent beeping
+12 00 00 12 00 00 00
+14 00 9b 00 00 01 80
+14 00 aa 00 00 01 80    -> Beep speeds up
+14 00 aa 00 00 01 80
+
+10 00 01 c3 04 00       -> Alarm triggered
+14 00 bf 00 00 01 80    -> Siren + Chime?
+14 00 bf 00 00 01 80
+
+d1 00 04
+14 00 01 00 00 01 80
+d1 00 03
+14 00 01 00 00 01 80
+d1 00 02
+14 00 01 00 00 01 80
+d1 00 01
+14 00 01 00 00 01 80
+d1 00 11
+11 00 00 00 00          -> Disarmed
+12 00 00 00 00 00 00    -> Zones untriggered
+14 00 15 00 00 00 80
+15 00 00 00 00 03
+12 00 10 00 00 00 00
+10 00 01 c2 04 00
+12 00 00 00 00 00 00
+10 00 01 c3 04 00

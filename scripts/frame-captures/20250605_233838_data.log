@@ -1,0 +1,19 @@
+# Stay mode
+d1 00 0e                -> Stay key pressed
+11 00 00 01 00          -> Stay mode activated / Turn on Arm light
+14 00 15 00 00 00 81    -> Triple beep
+d1 00 04
+14 00 01 00 00 00 81
+d1 00 03
+14 00 01 00 00 00 81
+d1 00 02
+14 00 01 00 00 00 81
+d1 00 01
+14 00 01 00 00 00 81
+d1 00 11                -> E key pressed
+11 00 00 00 00          -> Disarmed / Turn off Arm light
+14 00 15 00 00 00 80    -> Triple beep
+15 00 00 00 00 03       -> Display main menu?
+d1 00 0e                -> Stay key pressed
+11 00 00 01 00          -> Stay mode activated / Turn on Arm light
+14 00 15 00 00 00 81    -> Triple beep

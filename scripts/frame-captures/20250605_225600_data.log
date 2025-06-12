@@ -1,0 +1,7 @@
+# Memory menu
+d1 00 0b                        -> memory key pressed
+20 00 0a 70 00 01 00 00 01 01   -> display memory
+14 00 15 00 00 00 80            -> Triple beep
+d1 00 11                        -> E key pressed
+14 00 15 00 00 00 80            -> Triple beep
+15 00 00 00 00 03               -> Exit memory mode / display main menu
