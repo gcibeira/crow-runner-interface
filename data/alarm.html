@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Estado de la Alarma</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 400px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { color: #0056b3; }
+        #alarm-status { font-size: 1.5em; margin: 20px 0; }
+        .active { color: #4caf50; }
+        .inactive { color: #d32f2f; }
+        button { margin: 10px 5px 0 0; padding: 10px 20px; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; }
+        .on { background: #4caf50; color: #fff; }
+        .off { background: #d32f2f; color: #fff; }
+        #ws-status { font-size: 0.9em; color: #888; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Estado de la Alarma</h1>
+        <div id="alarm-status" class="inactive">Desactivada</div>
+        <button class="on" id="btn-on">Activar</button>
+        <button class="off" id="btn-off">Desactivar</button>
+        <div id="ws-status">Conectando...</div>
+    </div>
+    <script>
+        const alarmStatus = document.getElementById('alarm-status');
+        const btnOn = document.getElementById('btn-on');
+        const btnOff = document.getElementById('btn-off');
+        const wsStatus = document.getElementById('ws-status');
+
+        let ws;
+
+        function updateStatus(state) {
+            if (state === "on") {
+                alarmStatus.textContent = "Activada";
+                alarmStatus.className = "active";
+            } else {
+                alarmStatus.textContent = "Desactivada";
+                alarmStatus.className = "inactive";
+            }
+        }
+
+        function connectWS() {
+            ws = new WebSocket(`ws://${window.location.host}/ws_alarm`);
+            wsStatus.textContent = "Conectando...";
+
+            ws.onopen = () => {
+                wsStatus.textContent = "Conectado";
+            };
+
+            ws.onmessage = (event) => {
+                // Espera mensajes tipo: {"alarm":"on"} o {"alarm":"off"}
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.alarm) {
+                        updateStatus(data.alarm);
+                    }
+                } catch (e) {
+                    wsStatus.textContent = "Error de datos recibidos";
+                }
+            };
+
+            ws.onclose = () => {
+                wsStatus.textContent = "Desconectado. Reintentando...";
+                setTimeout(connectWS, 2000);
+            };
+
+            ws.onerror = () => {
+                wsStatus.textContent = "Error de WebSocket";
+            };
+        }
+
+        btnOn.onclick = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({cmd: "on"}));
+            }
+        };
+        btnOff.onclick = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({cmd: "off"}));
+            }
+        };
+
+        connectWS();
+    </script>
+</body>
+</html>

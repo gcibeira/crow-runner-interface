@@ -1,5 +1,4 @@
 #include "http_server.h"
-#include "esp_flash_partitions.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
@@ -7,12 +6,15 @@
 #include "freertos/FreeRTOS.h" // Para vTaskDelay
 #include "freertos/task.h"     // Para vTaskDelay
 #include <inttypes.h>
+#include <stdbool.h>
 
 static const char *TAG = "HTTP_SERVER";
 
-#define OTA_BUF_SIZE 2048 // Tamaño del buffer para leer los datos del firmware
-static char ota_write_data[OTA_BUF_SIZE + 1] = {
-    0}; // Buffer para chunks de firmware
+#define OTA_BUF_SIZE 2048                           // Tamaño del buffer para leer los datos del firmware
+static char ota_write_data[OTA_BUF_SIZE + 1] = {0}; // Buffer para chunks de firmware
+
+// Variable dummy para el estado de la alarma
+static bool alarm_on = false;
 
 // --- Manejador para la carga del firmware OTA ---
 static esp_err_t ota_update_post_handler(httpd_req_t *req) {
@@ -21,27 +23,23 @@ static esp_err_t ota_update_post_handler(httpd_req_t *req) {
   int received_len = 0;
   int total_len = req->content_len;
 
-  ESP_LOGI(TAG,
-           "Iniciando actualización OTA. Tamaño total del firmware: %d bytes",
-           total_len);
+  ESP_LOGI(TAG, "Iniciando actualización OTA. Tamaño total del firmware: %d bytes", total_len);
 
   update_partition = esp_ota_get_next_update_partition(NULL);
   if (update_partition == NULL) {
     ESP_LOGE(TAG, "Fallo al obtener la partición de actualización.");
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                        "Error de partición OTA");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error de partición OTA");
     return ESP_FAIL;
   }
-  ESP_LOGI(TAG, "Escribiendo en la partición: subtype %d, offset 0x%" PRIX32,
-           update_partition->subtype, update_partition->address);
+  ESP_LOGI(TAG, "Escribiendo en la partición: subtype %d, offset 0x%" PRIX32, update_partition->subtype,
+           update_partition->address);
 
   // Usar OTA_SIZE_UNKNOWN si el Content-Length no es fiable o no está presente
   // pero con el script JS lo estamos enviando.
   esp_err_t err = esp_ota_begin(update_partition, total_len, &ota_handle);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Error en esp_ota_begin: %s", esp_err_to_name(err));
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                        "Error al iniciar OTA");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error al iniciar OTA");
     return ESP_FAIL;
   }
   ESP_LOGI(TAG, "esp_ota_begin exitoso.");
@@ -58,40 +56,32 @@ static esp_err_t ota_update_post_handler(httpd_req_t *req) {
         continue;
       }
       ESP_LOGE(TAG, "Error al recibir datos del firmware: %d", data_read);
-      httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                          "Error de recepción de datos");
+      httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error de recepción de datos");
       esp_ota_abort(ota_handle);
       return ESP_FAIL;
-    } else if (data_read ==
-               0) { // Conexión cerrada por el cliente (o fin de datos)
+    } else if (data_read == 0) { // Conexión cerrada por el cliente (o fin de datos)
       if (received_len < total_len) {
-        ESP_LOGE(TAG, "Recepción incompleta. Recibidos %d de %d bytes.",
-                 received_len, total_len);
+        ESP_LOGE(TAG, "Recepción incompleta. Recibidos %d de %d bytes.", received_len, total_len);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Firmware incompleto");
         esp_ota_abort(ota_handle);
         return ESP_FAIL;
       }
-      ESP_LOGI(TAG,
-               "Recepción completada por cierre de stream. Total %d bytes.",
-               received_len);
+      ESP_LOGI(TAG, "Recepción completada por cierre de stream. Total %d bytes.", received_len);
       break; // Salir del bucle
     }
     // data_read > 0
     err = esp_ota_write(ota_handle, (const void *)ota_write_data, data_read);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "Error en esp_ota_write: %s", esp_err_to_name(err));
-      httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                          "Error al escribir datos OTA");
+      httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error al escribir datos OTA");
       esp_ota_abort(ota_handle);
       return ESP_FAIL;
     }
     received_len += data_read;
-    ESP_LOGD(TAG, "Escritos %d bytes, total %d/%d", data_read, received_len,
-             total_len);
+    ESP_LOGD(TAG, "Escritos %d bytes, total %d/%d", data_read, received_len, total_len);
 
     if (received_len == total_len) {
-      ESP_LOGI(TAG, "Recepción completada. Total de bytes recibidos: %d",
-               received_len);
+      ESP_LOGI(TAG, "Recepción completada. Total de bytes recibidos: %d", received_len);
       break; // Salir del bucle
     }
   }
@@ -99,22 +89,18 @@ static esp_err_t ota_update_post_handler(httpd_req_t *req) {
   err = esp_ota_end(ota_handle);
   if (err != ESP_OK) {
     if (err == ESP_ERR_OTA_VALIDATE_FAILED) {
-      ESP_LOGE(TAG,
-               "La validación de la imagen falló (checksum incorrecto, etc.)");
+      ESP_LOGE(TAG, "La validación de la imagen falló (checksum incorrecto, etc.)");
     }
     ESP_LOGE(TAG, "Error en esp_ota_end: %s", esp_err_to_name(err));
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                        "Error al finalizar OTA (validación)");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error al finalizar OTA (validación)");
     return ESP_FAIL;
   }
   ESP_LOGI(TAG, "esp_ota_end exitoso.");
 
   err = esp_ota_set_boot_partition(update_partition);
   if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Error en esp_ota_set_boot_partition: %s",
-             esp_err_to_name(err));
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                        "Error al establecer partición de arranque");
+    ESP_LOGE(TAG, "Error en esp_ota_set_boot_partition: %s", esp_err_to_name(err));
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Error al establecer partición de arranque");
     return ESP_FAIL;
   }
   ESP_LOGI(TAG, "esp_ota_set_boot_partition exitoso.");
@@ -156,6 +142,117 @@ static esp_err_t root_get_handler(httpd_req_t *req) {
   return ESP_OK;
 }
 
+// --- Manejador para servir la página OTA HTML ---
+static esp_err_t ota_get_handler(httpd_req_t *req) {
+  ESP_LOGI(TAG, "Sirviendo página HTML OTA (/ota)");
+
+  FILE *f = fopen("/www/ota.html", "r");
+  if (!f) {
+    ESP_LOGE(TAG, "No se pudo abrir /ota.html");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo abrir ota.html");
+    return ESP_FAIL;
+  }
+
+  httpd_resp_set_type(req, "text/html");
+  char buf[1024];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) {
+      ESP_LOGE(TAG, "Error enviando chunk HTML OTA");
+      fclose(f);
+      httpd_resp_sendstr_chunk(req, NULL); // Terminar respuesta
+      return ESP_FAIL;
+    }
+  }
+  fclose(f);
+  httpd_resp_sendstr_chunk(req, NULL); // Terminar respuesta
+  return ESP_OK;
+}
+
+// --- Manejador para servir la página de la alarma ---
+static esp_err_t alarm_get_handler(httpd_req_t *req) {
+  ESP_LOGI(TAG, "Sirviendo página HTML de alarma (/alarm)");
+
+  FILE *f = fopen("/www/alarm.html", "r");
+  if (!f) {
+    ESP_LOGE(TAG, "No se pudo abrir /alarm.html");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No se pudo abrir alarm.html");
+    return ESP_FAIL;
+  }
+
+  httpd_resp_set_type(req, "text/html");
+  char buf[1024];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) {
+      ESP_LOGE(TAG, "Error enviando chunk HTML alarma");
+      fclose(f);
+      httpd_resp_sendstr_chunk(req, NULL); // Terminar respuesta
+      return ESP_FAIL;
+    }
+  }
+  fclose(f);
+  httpd_resp_sendstr_chunk(req, NULL); // Terminar respuesta
+  return ESP_OK;
+}
+
+// --- WebSocket handler para /ws_alarm ---
+static esp_err_t ws_alarm_handler(httpd_req_t *req) {
+  if (req->method == HTTP_GET) {
+    // Nueva conexión WebSocket
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    // Enviar estado inicial
+    char msg[32];
+    snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+    ws_pkt.payload = (uint8_t *)msg;
+    ws_pkt.len = strlen(msg);
+    httpd_ws_send_frame(req, &ws_pkt);
+    return ESP_OK;
+  }
+
+  // Recibir comandos
+  httpd_ws_frame_t ws_pkt;
+  memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+  ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+  // Obtener tamaño del frame
+  esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Error obteniendo tamaño del frame WS: %s", esp_err_to_name(ret));
+    return ret;
+  }
+  if (ws_pkt.len > 128) return ESP_FAIL; // Limitar tamaño
+
+  // Leer frame
+  uint8_t buf[128] = {0};
+  ws_pkt.payload = buf;
+  ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Error recibiendo frame WS: %s", esp_err_to_name(ret));
+    return ret;
+  }
+  buf[ws_pkt.len] = 0;
+
+  // Procesar comando simple JSON: {"cmd":"on"} o {"cmd":"off"}
+  if (strstr((char*)buf, "\"cmd\":\"on\"")) {
+    alarm_on = true;
+  } else if (strstr((char*)buf, "\"cmd\":\"off\"")) {
+    alarm_on = false;
+  }
+
+  // Responder con el nuevo estado
+  char msg[32];
+  snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+  ws_pkt.payload = (uint8_t *)msg;
+  ws_pkt.len = strlen(msg);
+  httpd_ws_send_frame(req, &ws_pkt);
+
+  return ESP_OK;
+}
+
 static httpd_handle_t server = NULL;
 
 esp_err_t http_server_start(void) {
@@ -166,20 +263,32 @@ esp_err_t http_server_start(void) {
   // config.recv_wait_timeout = 10; // Segundos
   // config.send_wait_timeout = 10; // Segundos
 
-  ESP_LOGI(TAG, "Iniciando servidor HTTP en el puerto: '%d'",
-           config.server_port);
+  ESP_LOGI(TAG, "Iniciando servidor HTTP en el puerto: '%d'", config.server_port);
   esp_err_t ret = httpd_start(&server, &config);
   if (ret == ESP_OK) {
-    httpd_uri_t uri_root_get = {.uri = "/",
-                                .method = HTTP_GET,
-                                .handler = root_get_handler,
-                                .user_ctx = NULL};
+    httpd_uri_t uri_root_get = {.uri = "/", .method = HTTP_GET, .handler = root_get_handler, .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_root_get);
 
-    httpd_uri_t uri_ota_update_post = {.uri = "/ota_update",
-                                       .method = HTTP_POST,
-                                       .handler = ota_update_post_handler,
-                                       .user_ctx = NULL};
+    // Registrar handler para /ota
+    httpd_uri_t uri_ota_get = {.uri = "/ota", .method = HTTP_GET, .handler = ota_get_handler, .user_ctx = NULL};
+    httpd_register_uri_handler(server, &uri_ota_get);
+
+    // Registrar handler para /alarm
+    httpd_uri_t uri_alarm_get = {.uri = "/alarm", .method = HTTP_GET, .handler = alarm_get_handler, .user_ctx = NULL};
+    httpd_register_uri_handler(server, &uri_alarm_get);
+
+    // Registrar handler WebSocket para /ws_alarm
+    httpd_uri_t uri_ws_alarm = {
+      .uri = "/ws_alarm",
+      .method = HTTP_GET,
+      .handler = ws_alarm_handler,
+      .is_websocket = true,
+      .user_ctx = NULL
+    };
+    httpd_register_uri_handler(server, &uri_ws_alarm);
+
+    httpd_uri_t uri_ota_update_post = {
+        .uri = "/ota_update", .method = HTTP_POST, .handler = ota_update_post_handler, .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ota_update_post);
     ESP_LOGI(TAG, "Servidor HTTP iniciado y handlers registrados.");
     return ESP_OK;
