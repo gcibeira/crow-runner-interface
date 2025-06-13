@@ -2,7 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "frame_parser.h"
+#include "frame_handler.h"
 #include "wifi_manager.h"
 #include "http_server.h"
 #include "udp_logging.h"
@@ -67,10 +67,10 @@ void app_main(void) {
     ESP_ERROR_CHECK(http_server_start());
     ESP_LOGI(TAG_MAIN, "Servidor OTA HTTP iniciado correctamente.");
 
-    ESP_LOGI(TAG_MAIN, "Inicializando Frame Parser...");
+    ESP_LOGI(TAG_MAIN, "Inicializando Frame Handler...");
     ESP_ERROR_CHECK(udp_logging_init(UDP_LOGGING_IP, UDP_LOGGING_PORT));
-    ESP_ERROR_CHECK(frame_parser_init(23, 18));
-    frame_parser_register_callback(frame_udp_callback);
+    ESP_ERROR_CHECK(frame_handler_init(23, 18));
+    on_frame(frame_udp_callback);
     ESP_LOGI(TAG_MAIN, "Sistema iniciado y esperando bits...");
 
 
