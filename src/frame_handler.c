@@ -1,4 +1,4 @@
-#include "frame_parser.h"
+#include "frame_handler.h"
 #include "driver/gpio.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -6,14 +6,13 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
-
-static const char *TAG = "FRAME_PARSER";
+static const char *TAG = "FRAME_HANDLER";
 static QueueHandle_t frame_queue;
 static int clk_pin = -1;
 static int data_pin = -1;
 static frame_callback_t frame_callback = NULL;
 
-void frame_parser_register_callback(frame_callback_t callback) { frame_callback = callback; }
+void on_frame(frame_callback_t callback) { frame_callback = callback; }
 
 static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
   static volatile bool in_frame = false;
@@ -90,7 +89,7 @@ static void frame_processor_task(void *arg) {
   }
 }
 
-esp_err_t frame_parser_init(int data_pin_param, int clk_pin_param) {
+esp_err_t frame_handler_init(int data_pin_param, int clk_pin_param) {
   if (data_pin_param < 0 || clk_pin_param < 0 || data_pin_param == clk_pin_param) {
     ESP_LOGE(TAG, "Invalid GPIO pin numbers");
     return ESP_ERR_INVALID_ARG;
@@ -138,6 +137,6 @@ esp_err_t frame_parser_init(int data_pin_param, int clk_pin_param) {
     ESP_LOGE(TAG, "Error adding ISR handler");
     return ESP_FAIL;
   }
-  ESP_LOGI(TAG, "Frame parser started successfully");
+  ESP_LOGI(TAG, "Frame handler started successfully");
   return ESP_OK;
 }

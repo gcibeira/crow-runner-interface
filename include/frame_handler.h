@@ -1,5 +1,5 @@
-#ifndef FRAME_PARSER_H
-#define FRAME_PARSER_H
+#ifndef FRAME_HANDLER_H
+#define FRAME_HANDLER_H
 
 #include <stdint.h>
 #include "esp_err.h"
@@ -15,17 +15,17 @@ typedef struct {
 typedef void (*frame_callback_t)(const frame_t *frame);
 
 /**
- * @brief Initializes the serial frame parser via GPIO.
+ * @brief Initializes the serial frame handler via GPIO.
  * @param data_pin Data GPIO pin.
  * @param clk_pin Clock GPIO pin.
  * @return ESP_OK if successful, ESP-IDF error code otherwise.
  */
-esp_err_t frame_parser_init(int data_pin, int clk_pin);
+esp_err_t frame_handler_init(int data_pin, int clk_pin);
 
 /**
  * @brief Registers a callback that will be called with each received frame.
  * @param callback Callback function.
  */
-void frame_parser_register_callback(frame_callback_t callback);
+void on_frame(frame_callback_t callback);
 
-#endif // FRAME_PARSER_H
+#endif // FRAME_HANDLER_H
