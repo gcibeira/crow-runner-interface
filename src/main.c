@@ -2,36 +2,22 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "frame_handler.h"
 #include "wifi_manager.h"
 #include "http_server.h"
 #include "udp_logging.h"
 #include <esp_netif_types.h>
 #include "esp_spiffs.h"
-//#include "protocol_handler.h"
+#include "frame_handler.h"
+#include "protocol_handler.h"
 
 static const char *TAG_MAIN = "APP_MAIN";
 
 #define UDP_LOGGING_IP   "192.168.100.11"
 #define UDP_LOGGING_PORT 5000
 
-static void frame_udp_callback(const frame_t *received_frame) {
-    udp_logging_send(received_frame->data, received_frame->length);
+void zone_activity_callback(const zone_activity_event_t *event) {
+    udp_logging_send("main: zone activity callback", 28);
 }
-
-/*static void app_protocol_event_callback(const protocol_event_t *event) {
-    switch (event->type) {
-        case PROTO_EVT_KEYPAD:
-            ESP_LOGI(TAG_MAIN, "Tecla presionada: 0x%02x", event->data.keypad.key_code);
-            break;
-        case PROTO_EVT_LIGHTS:
-            ESP_LOGI(TAG_MAIN, "Luz %d estado %d", event->data.lights.light_id, event->data.lights.state);
-            break;
-        default:
-            ESP_LOGI(TAG_MAIN, "Evento desconocido");
-            break;
-    }
-}*/
 
 void app_main(void) {
     esp_err_t ret = nvs_flash_init();
@@ -69,11 +55,9 @@ void app_main(void) {
 
     ESP_LOGI(TAG_MAIN, "Inicializando Frame Handler...");
     ESP_ERROR_CHECK(udp_logging_init(UDP_LOGGING_IP, UDP_LOGGING_PORT));
+    on_zone_activity(zone_activity_callback);
+    protocol_handler_init();
     ESP_ERROR_CHECK(frame_handler_init(23, 18));
-    on_frame(frame_udp_callback);
+
     ESP_LOGI(TAG_MAIN, "Sistema iniciado y esperando bits...");
-
-
-    /*protocol_handler_init();
-    protocol_handler_register_callback(app_protocol_event_callback);*/
 }

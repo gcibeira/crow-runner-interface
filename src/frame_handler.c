@@ -74,7 +74,7 @@ static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
 }
 
 static void IRAM_ATTR clk_isr_handler(void *arg) {
-  uint8_t incoming_bit = (uint8_t)(!gpio_get_level(data_pin));
+  uint8_t incoming_bit = (uint8_t)(gpio_get_level(data_pin));
   frame_process_bit(incoming_bit);
 }
 
@@ -112,7 +112,7 @@ esp_err_t frame_handler_init(int data_pin_param, int clk_pin_param) {
                                .mode = GPIO_MODE_INPUT,
                                .pull_up_en = GPIO_PULLUP_DISABLE,
                                .pull_down_en = GPIO_PULLDOWN_DISABLE,
-                               .intr_type = GPIO_INTR_POSEDGE};
+                               .intr_type = GPIO_INTR_NEGEDGE};
   if (gpio_config(&io_conf_clk) != ESP_OK) {
     ESP_LOGE(TAG, "Error configuring CLK_PIN");
     return ESP_FAIL;

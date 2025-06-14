@@ -7,14 +7,49 @@
 #include "freertos/task.h"     // Para vTaskDelay
 #include <inttypes.h>
 #include <stdbool.h>
+#include "protocol_handler.h"
 
 static const char *TAG = "HTTP_SERVER";
 
 #define OTA_BUF_SIZE 2048                           // Tamaño del buffer para leer los datos del firmware
 static char ota_write_data[OTA_BUF_SIZE + 1] = {0}; // Buffer para chunks de firmware
 
+static httpd_handle_t server = NULL;
+
 // Variable dummy para el estado de la alarma
 static bool alarm_on = false;
+
+// --- Notificar a todos los clientes WebSocket de /ws_alarm ---
+static void notify_alarm_ws_clients(void) {
+    if (!server) return;
+    // Mensaje JSON con el estado actual
+    char msg[32];
+    snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+    httpd_ws_frame_t ws_pkt = {
+        .type = HTTPD_WS_TYPE_TEXT,
+        .payload = (uint8_t *)msg,
+        .len = strlen(msg)
+    };
+    // Enviar a todos los clientes conectados a /ws_alarm
+    // NOTA: httpd_ws_send_frame_to_all no existe en ESP-IDF, se debe iterar sobre los sockets.
+    // Aquí se muestra un ejemplo básico para enviar a todos los sockets activos.
+    size_t fds = CONFIG_LWIP_MAX_SOCKETS;
+    int client_fds[CONFIG_LWIP_MAX_SOCKETS];
+    size_t client_count = httpd_get_client_list(server, &fds, client_fds);
+    for (size_t i = 0; i < client_count; ++i) {
+        httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+    }
+}
+
+// Callback para actualizar alarm_on según el estado del sistema
+static void system_state_update_callback(const system_state_event_t *event) {
+    if (event->state == SYSTEM_STATE_DISARMED) {
+        alarm_on = false;
+    } else {
+        alarm_on = true;
+    }
+    notify_alarm_ws_clients();
+}
 
 // --- Manejador para la carga del firmware OTA ---
 static esp_err_t ota_update_post_handler(httpd_req_t *req) {
@@ -237,10 +272,14 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
   buf[ws_pkt.len] = 0;
 
   // Procesar comando simple JSON: {"cmd":"on"} o {"cmd":"off"}
+  bool prev_alarm_on = alarm_on;
   if (strstr((char*)buf, "\"cmd\":\"on\"")) {
     alarm_on = true;
   } else if (strstr((char*)buf, "\"cmd\":\"off\"")) {
     alarm_on = false;
+  }
+  if (alarm_on != prev_alarm_on) {
+    notify_alarm_ws_clients();
   }
 
   // Responder con el nuevo estado
@@ -252,8 +291,6 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
 
   return ESP_OK;
 }
-
-static httpd_handle_t server = NULL;
 
 esp_err_t http_server_start(void) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -290,6 +327,10 @@ esp_err_t http_server_start(void) {
     httpd_uri_t uri_ota_update_post = {
         .uri = "/ota_update", .method = HTTP_POST, .handler = ota_update_post_handler, .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ota_update_post);
+
+    // Registrar callback para cambios de estado del sistema
+    on_system_state(system_state_update_callback);
+
     ESP_LOGI(TAG, "Servidor HTTP iniciado y handlers registrados.");
     return ESP_OK;
   }

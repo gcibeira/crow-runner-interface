@@ -12,6 +12,9 @@ static void frame_callback(const frame_t *frame) {
   case 0xd1:
     event.type = PROTO_EVT_KEYPAD;
     event.data.keypad.key_code = frame->data[2];
+    if (keypad_callback) {
+      keypad_callback(&event.data.keypad);
+    }
     break;
   case 0x11:
     event.type = PROTO_EVT_SYSTEM_STATE;
@@ -26,18 +29,22 @@ static void frame_callback(const frame_t *frame) {
     } else {
       event.data.system_state.state = SYSTEM_STATE_UNKNOWN;
     }
+    if (system_state_callback) {
+      system_state_callback(&event.data.system_state);
+    }
     break;
   case 0x12:
     event.type = PROTO_EVT_ZONE_ACTIVITY;
     event.data.zone_activity.active_zones = frame->data[2];
     event.data.zone_activity.triggered_zones = frame->data[3];
+    if (zone_activity_callback) {
+      zone_activity_callback(&event.data.zone_activity);
+    }
     break;
   default:
     event.type = PROTO_EVT_UNKNOWN;
     break;
   }
-
-  dispatch_event(&event);
 }
 
 void protocol_handler_init(void) { on_frame(frame_callback); }
@@ -49,31 +56,3 @@ void on_keypad(keypad_event_callback_t cb) { keypad_callback = cb; }
 void on_system_state(system_state_event_callback_t cb) { system_state_callback = cb; }
 
 void on_zone_activity(zone_activity_event_callback_t cb) { zone_activity_callback = cb; }
-
-static void dispatch_event(const protocol_event_t *event) {
-  // Callback genérico
-  if (protocol_event_callback) {
-    protocol_event_callback(event);
-  }
-
-  // Callbacks específicos
-  switch (event->type) {
-  case PROTO_EVT_KEYPAD:
-    if (keypad_callback) {
-      keypad_callback(&event->data.keypad);
-    }
-    break;
-  case PROTO_EVT_SYSTEM_STATE:
-    if (system_state_callback) {
-      system_state_callback(&event->data.system_state);
-    }
-    break;
-  case PROTO_EVT_ZONE_ACTIVITY:
-    if (zone_activity_callback) {
-      zone_activity_callback(&event->data.zone_activity);
-    }
-    break;
-  default:
-    break;
-  }
-}

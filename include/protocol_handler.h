@@ -66,7 +66,4 @@ void on_keypad(keypad_event_callback_t cb);
 void on_system_state(system_state_event_callback_t cb);
 void on_zone_activity(zone_activity_event_callback_t cb);
 
-static void dispatch_event(const protocol_event_t *event);
-
-
 #endif // PROTOCOL_HANDLER_H
