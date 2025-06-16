@@ -12,8 +12,6 @@ typedef struct {
   uint8_t length;
 } frame_t;
 
-typedef void (*frame_callback_t)(const frame_t *frame);
-
 /**
  * @brief Initializes the serial frame handler via GPIO.
  * @param data_pin Data GPIO pin.
@@ -21,11 +19,5 @@ typedef void (*frame_callback_t)(const frame_t *frame);
  * @return ESP_OK if successful, ESP-IDF error code otherwise.
  */
 esp_err_t frame_handler_init(int data_pin, int clk_pin);
-
-/**
- * @brief Registers a callback that will be called with each received frame.
- * @param callback Callback function.
- */
-void on_frame(frame_callback_t callback);
 
 #endif // FRAME_HANDLER_H

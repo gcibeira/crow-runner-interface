@@ -5,9 +5,9 @@
 #include "esp_partition.h"
 #include "freertos/FreeRTOS.h" // Para vTaskDelay
 #include "freertos/task.h"     // Para vTaskDelay
+#include "protocol_handler.h"
 #include <inttypes.h>
 #include <stdbool.h>
-#include "protocol_handler.h"
 
 static const char *TAG = "HTTP_SERVER";
 
@@ -21,34 +21,41 @@ static bool alarm_on = false;
 
 // --- Notificar a todos los clientes WebSocket de /ws_alarm ---
 static void notify_alarm_ws_clients(void) {
-    if (!server) return;
-    // Mensaje JSON con el estado actual
-    char msg[32];
-    snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
-    httpd_ws_frame_t ws_pkt = {
-        .type = HTTPD_WS_TYPE_TEXT,
-        .payload = (uint8_t *)msg,
-        .len = strlen(msg)
-    };
-    // Enviar a todos los clientes conectados a /ws_alarm
-    // NOTA: httpd_ws_send_frame_to_all no existe en ESP-IDF, se debe iterar sobre los sockets.
-    // Aquí se muestra un ejemplo básico para enviar a todos los sockets activos.
-    size_t fds = CONFIG_LWIP_MAX_SOCKETS;
-    int client_fds[CONFIG_LWIP_MAX_SOCKETS];
-    size_t client_count = httpd_get_client_list(server, &fds, client_fds);
-    for (size_t i = 0; i < client_count; ++i) {
-        httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+  if (!server)
+    return;
+
+  // 1) Prepara el mensaje JSON
+  char msg[32];
+  snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+  httpd_ws_frame_t ws_pkt = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)msg, .len = strlen(msg)};
+
+  // 2) Obtén la lista de clientes
+  size_t max_clients = CONFIG_LWIP_MAX_SOCKETS;
+  int client_fds[CONFIG_LWIP_MAX_SOCKETS];
+  esp_err_t err = httpd_get_client_list(server, &max_clients, client_fds);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "httpd_get_client_list failed: %s", esp_err_to_name(err));
+    return;
+  }
+  ESP_LOGI(TAG, "Enviando notificación a %u clientes", (unsigned)max_clients);
+
+  // 3) Recorre los fds reales y envía el frame
+  for (size_t i = 0; i < max_clients; ++i) {
+    err = httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "Error al enviar WS frame en fd %d: %s", client_fds[i], esp_err_to_name(err));
     }
+  }
 }
 
 // Callback para actualizar alarm_on según el estado del sistema
-static void system_state_update_callback(const system_state_event_t *event) {
-    if (event->state == SYSTEM_STATE_DISARMED) {
-        alarm_on = false;
-    } else {
-        alarm_on = true;
-    }
-    notify_alarm_ws_clients();
+static void system_state_callback(const system_state_event_t *event) {
+  if (event->state != SYSTEM_STATE_DISARMED) {
+    alarm_on = true;
+  } else {
+    alarm_on = false;
+  }
+  notify_alarm_ws_clients();
 }
 
 // --- Manejador para la carga del firmware OTA ---
@@ -259,7 +266,8 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
     ESP_LOGE(TAG, "Error obteniendo tamaño del frame WS: %s", esp_err_to_name(ret));
     return ret;
   }
-  if (ws_pkt.len > 128) return ESP_FAIL; // Limitar tamaño
+  if (ws_pkt.len > 128)
+    return ESP_FAIL; // Limitar tamaño
 
   // Leer frame
   uint8_t buf[128] = {0};
@@ -273,21 +281,14 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
 
   // Procesar comando simple JSON: {"cmd":"on"} o {"cmd":"off"}
   bool prev_alarm_on = alarm_on;
-  if (strstr((char*)buf, "\"cmd\":\"on\"")) {
+  if (strstr((char *)buf, "\"cmd\":\"on\"")) {
     alarm_on = true;
-  } else if (strstr((char*)buf, "\"cmd\":\"off\"")) {
+  } else if (strstr((char *)buf, "\"cmd\":\"off\"")) {
     alarm_on = false;
   }
   if (alarm_on != prev_alarm_on) {
     notify_alarm_ws_clients();
   }
-
-  // Responder con el nuevo estado
-  char msg[32];
-  snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
-  ws_pkt.payload = (uint8_t *)msg;
-  ws_pkt.len = strlen(msg);
-  httpd_ws_send_frame(req, &ws_pkt);
 
   return ESP_OK;
 }
@@ -296,9 +297,6 @@ esp_err_t http_server_start(void) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.max_uri_handlers = 8;
   config.lru_purge_enable = true;
-  // Aumentar el timeout de recepción si se esperan subidas largas y lentas
-  // config.recv_wait_timeout = 10; // Segundos
-  // config.send_wait_timeout = 10; // Segundos
 
   ESP_LOGI(TAG, "Iniciando servidor HTTP en el puerto: '%d'", config.server_port);
   esp_err_t ret = httpd_start(&server, &config);
@@ -316,12 +314,7 @@ esp_err_t http_server_start(void) {
 
     // Registrar handler WebSocket para /ws_alarm
     httpd_uri_t uri_ws_alarm = {
-      .uri = "/ws_alarm",
-      .method = HTTP_GET,
-      .handler = ws_alarm_handler,
-      .is_websocket = true,
-      .user_ctx = NULL
-    };
+        .uri = "/ws_alarm", .method = HTTP_GET, .handler = ws_alarm_handler, .is_websocket = true, .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ws_alarm);
 
     httpd_uri_t uri_ota_update_post = {
@@ -329,7 +322,7 @@ esp_err_t http_server_start(void) {
     httpd_register_uri_handler(server, &uri_ota_update_post);
 
     // Registrar callback para cambios de estado del sistema
-    on_system_state(system_state_update_callback);
+    on_system_state(system_state_callback);
 
     ESP_LOGI(TAG, "Servidor HTTP iniciado y handlers registrados.");
     return ESP_OK;

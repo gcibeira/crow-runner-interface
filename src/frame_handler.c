@@ -5,14 +5,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "protocol_handler.h"
 
 static const char *TAG = "FRAME_HANDLER";
 static QueueHandle_t frame_queue;
 static int clk_pin = -1;
 static int data_pin = -1;
-static frame_callback_t frame_callback = NULL;
-
-void on_frame(frame_callback_t callback) { frame_callback = callback; }
 
 static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
   static volatile bool in_frame = false;
@@ -83,8 +81,8 @@ static void frame_processor_task(void *arg) {
 
   while (true) {
     if (xQueueReceive(frame_queue, &received_frame, portMAX_DELAY) == pdPASS) {
-      if (frame_callback && received_frame.length > 0)
-        frame_callback(&received_frame);
+      if (received_frame.length > 0)
+        process_frame(&received_frame);
     }
   }
 }
@@ -124,7 +122,7 @@ esp_err_t frame_handler_init(int data_pin_param, int clk_pin_param) {
     return ESP_ERR_NO_MEM;
   }
 
-  if (xTaskCreate(frame_processor_task, "frame_processor_task", 1024, NULL, configMAX_PRIORITIES - 5, NULL) != pdPASS) {
+  if (xTaskCreate(frame_processor_task, "frame_processor_task", 4096, NULL, configMAX_PRIORITIES - 5, NULL) != pdPASS) {
     ESP_LOGE(TAG, "Error creating frame_processor_task");
     return ESP_FAIL;
   }

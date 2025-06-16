@@ -1,8 +1,8 @@
 #ifndef PROTOCOL_HANDLER_H
 #define PROTOCOL_HANDLER_H
 
-#include "frame_handler.h"
 #include <stdint.h>
+#include "frame_handler.h"
 
 // Definición de tipos de eventos del protocolo
 typedef enum {
@@ -53,14 +53,15 @@ typedef struct {
   } data;
 } protocol_event_t;
 
-typedef void (*protocol_event_callback_t)(const protocol_event_t *event);
 
-// Callbacks específicos por tipo de evento
+void process_frame(const frame_t *frame);
+
+// Declaración de callbacks para eventos del protocolo
+typedef void (*protocol_event_callback_t)(const protocol_event_t *event);
 typedef void (*keypad_event_callback_t)(const keypad_event_t *event);
 typedef void (*system_state_event_callback_t)(const system_state_event_t *event);
 typedef void (*zone_activity_event_callback_t)(const zone_activity_event_t *event);
 
-void protocol_handler_init(void);
 void on_event(protocol_event_callback_t cb);
 void on_keypad(keypad_event_callback_t cb);
 void on_system_state(system_state_event_callback_t cb);

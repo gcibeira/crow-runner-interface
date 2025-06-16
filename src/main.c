@@ -15,10 +15,6 @@ static const char *TAG_MAIN = "APP_MAIN";
 #define UDP_LOGGING_IP   "192.168.100.11"
 #define UDP_LOGGING_PORT 5000
 
-void zone_activity_callback(const zone_activity_event_t *event) {
-    udp_logging_send("main: zone activity callback", 28);
-}
-
 void app_main(void) {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -54,9 +50,6 @@ void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Servidor OTA HTTP iniciado correctamente.");
 
     ESP_LOGI(TAG_MAIN, "Inicializando Frame Handler...");
-    ESP_ERROR_CHECK(udp_logging_init(UDP_LOGGING_IP, UDP_LOGGING_PORT));
-    on_zone_activity(zone_activity_callback);
-    protocol_handler_init();
     ESP_ERROR_CHECK(frame_handler_init(23, 18));
 
     ESP_LOGI(TAG_MAIN, "Sistema iniciado y esperando bits...");
