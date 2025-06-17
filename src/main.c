@@ -7,27 +7,29 @@
 #include "udp_logging.h"
 #include <esp_netif_types.h>
 #include "esp_spiffs.h"
-#include "frame_handler.h"
-#include "protocol_handler.h"
-
-static const char *TAG_MAIN = "APP_MAIN";
+#include "alarm_manager.h"
 
 #define UDP_LOGGING_IP   "192.168.100.11"
 #define UDP_LOGGING_PORT 5000
 
+#define DATA_PIN 23
+#define CLK_PIN 18
+
+static const char *TAG_MAIN = "APP_MAIN";
+
 void app_main(void) {
+    // Initialize NVS Flash
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG_MAIN, "Error inicializando NVS.");
+        ESP_LOGE(TAG_MAIN, "Error initializing NVS.");
         return;
     }
-    ESP_LOGI(TAG_MAIN, "NVS inicializado.");
     
-    ESP_LOGI(TAG_MAIN, "Inicializando SPIFFS...");
+    // Initialize SPIFFS File System
     esp_vfs_spiffs_conf_t conf = {
         .base_path = "/www",
         .partition_label = NULL,
@@ -36,21 +38,18 @@ void app_main(void) {
     };
     esp_err_t ret_spiffs = esp_vfs_spiffs_register(&conf);
     if (ret_spiffs != ESP_OK) {
-        ESP_LOGE(TAG_MAIN, "Error inicializando SPIFFS (%s)", esp_err_to_name(ret_spiffs));
+        ESP_LOGE(TAG_MAIN, "Error initializing SPIFFS (%s)", esp_err_to_name(ret_spiffs));
         return;
     }
-    ESP_LOGI(TAG_MAIN, "SPIFFS inicializado correctamente.");
-    
-    ESP_LOGI(TAG_MAIN, "Inicializando Wi-Fi...");
+
+    // Initialize Wifi Manager
     ESP_ERROR_CHECK(wifi_manager_init_sta());
-    ESP_LOGI(TAG_MAIN, "Wi-Fi conectado.");
-
-    ESP_LOGI(TAG_MAIN, "Iniciando servidor OTA HTTP...");
+    
+    // Start HTTP Server
     ESP_ERROR_CHECK(http_server_start());
-    ESP_LOGI(TAG_MAIN, "Servidor OTA HTTP iniciado correctamente.");
 
-    ESP_LOGI(TAG_MAIN, "Inicializando Frame Handler...");
-    ESP_ERROR_CHECK(frame_handler_init(23, 18));
+    // Initialize Alarm manager
+    ESP_ERROR_CHECK(alarm_manager_init(DATA_PIN, CLK_PIN));
 
-    ESP_LOGI(TAG_MAIN, "Sistema iniciado y esperando bits...");
+    ESP_LOGI(TAG_MAIN, "System started and waiting for events...");
 }

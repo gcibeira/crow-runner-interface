@@ -1,5 +1,6 @@
 #include "alarm_manager.h"
 #include <string.h>
+#include "frame_handler.h"
 
 static alarm_state_t alarm_state = {
     .system_state = SYSTEM_STATE_UNKNOWN,
@@ -40,8 +41,13 @@ static void protocol_event_handler(const protocol_event_t *event) {
     }
 }
 
-void alarm_manager_init(void) {
+esp_err_t alarm_manager_init(int data_pin, int clk_pin) {
+    esp_err_t err = frame_handler_init(data_pin, clk_pin);
+    if (err != ESP_OK) {
+        return err;
+    }
     on_event(protocol_event_handler);
+    return ESP_OK;
 }
 
 void alarm_manager_on_state_changed(alarm_state_changed_callback_t cb) {

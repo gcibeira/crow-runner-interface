@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include "protocol_handler.h"
+#include "frame_handler.h"
+#include "esp_err.h"
 
 // Estructura para mantener el estado de la alarma
 typedef struct {
@@ -14,8 +16,8 @@ typedef struct {
 // Callback para notificar cambios de estado de la alarma
 typedef void (*alarm_state_changed_callback_t)(const alarm_state_t* state);
 
-// Inicializa el alarm manager y registra los callbacks necesarios
-void alarm_manager_init(void);
+// Inicializa el alarm manager y frame handler internamente con los pines indicados
+esp_err_t alarm_manager_init(int data_pin, int clk_pin);
 
 // Obtiene el estado actual de la alarma
 const alarm_state_t* alarm_manager_get_state(void);
