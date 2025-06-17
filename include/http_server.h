@@ -2,6 +2,7 @@
 #define HTTP_SERVER_H
 
 #include "esp_err.h"
+#include "esp_http_server.h"
 
 /**
  * @brief Inicia el servidor HTTP para actualizaciones OTA.
@@ -12,6 +13,11 @@
  * - ESP_FAIL: Si hubo un error al iniciar el servidor.
  */
 esp_err_t http_server_start(void);
+
+/**
+ * @brief Devuelve el handle del servidor HTTP actual.
+ */
+httpd_handle_t* get_http_server_handle(void);
 
 /**
  * @brief Detiene el servidor HTTP OTA.
