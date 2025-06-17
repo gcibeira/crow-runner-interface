@@ -16,7 +16,7 @@
 static httpd_handle_t server = NULL;
 
 // Expose server for notify_alarm_ws_clients
-httpd_handle_t* get_http_server_handle() { return &server; }
+httpd_handle_t get_http_server_handle(void) { return server; }
 
 esp_err_t http_server_start(void) {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();

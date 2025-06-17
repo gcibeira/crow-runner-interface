@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "frame_handler.h"
 
-// Definición de tipos de eventos del protocolo
+// Definition of protocol event types
 typedef enum {
   PROTO_EVT_KEYPAD,
   PROTO_EVT_LIGHTS,
@@ -18,7 +18,7 @@ typedef enum {
   PROTO_EVT_UNKNOWN
 } protocol_event_type_t;
 
-// Enum para los estados del sistema
+// Enum for system states
 typedef enum {
   SYSTEM_STATE_DISARMED,
   SYSTEM_STATE_ARMED,
@@ -27,23 +27,23 @@ typedef enum {
   SYSTEM_STATE_UNKNOWN
 } system_state_t;
 
-// Estructura para estado del sistema
+// Structure for system state
 typedef struct {
   system_state_t state;
 } system_state_event_t;
 
-// Estructura para actividad de zonas
+// Structure for zone activity
 typedef struct {
   uint8_t active_zones;    // bitmap
   uint8_t triggered_zones; // bitmap
 } zone_activity_event_t;
 
-// Estructura para evento de teclado
+// Structure for keypad event
 typedef struct {
   uint8_t key_code;
 } keypad_event_t;
 
-// Estructura para eventos del protocolo
+// Structure for protocol events
 typedef struct {
   protocol_event_type_t type;
   union {

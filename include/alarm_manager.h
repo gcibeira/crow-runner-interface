@@ -6,23 +6,23 @@
 #include "frame_handler.h"
 #include "esp_err.h"
 
-// Estructura para mantener el estado de la alarma
+// Structure to maintain the alarm state
 typedef struct {
     system_state_t system_state;
     uint8_t active_zones;
     uint8_t triggered_zones;
 } alarm_state_t;
 
-// Callback para notificar cambios de estado de la alarma
+// Callback to notify alarm state changes
 typedef void (*alarm_state_changed_callback_t)(const alarm_state_t* state);
 
-// Inicializa el alarm manager y frame handler internamente con los pines indicados
+// Initializes the alarm manager and frame handler internally with the specified pins
 esp_err_t alarm_manager_init(int data_pin, int clk_pin);
 
-// Obtiene el estado actual de la alarma
+// Gets the current alarm state
 const alarm_state_t* alarm_manager_get_state(void);
 
-// Registra un callback que será llamado cuando cambie el estado de la alarma
+// Registers a callback that will be called when the alarm state changes
 void alarm_manager_on_state_changed(alarm_state_changed_callback_t cb);
 
 #endif // ALARM_MANAGER_H

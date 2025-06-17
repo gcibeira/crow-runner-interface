@@ -5,7 +5,7 @@
 #include "http_server.h"
 
 void notify_alarm_ws_clients(const alarm_state_t* state) {
-  httpd_handle_t server = *get_http_server_handle();
+  httpd_handle_t server = get_http_server_handle();
   if (!server)
     return;
 
