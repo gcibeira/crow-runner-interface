@@ -6,30 +6,27 @@
 #include "freertos/FreeRTOS.h" // Para vTaskDelay
 #include "freertos/task.h"     // Para vTaskDelay
 #include "protocol_handler.h"
+#include "alarm_manager.h"
 #include <inttypes.h>
 #include <stdbool.h>
 
-static const char *TAG = "HTTP_SERVER";
-
 #define OTA_BUF_SIZE 2048                           // Tamaño del buffer para leer los datos del firmware
-static char ota_write_data[OTA_BUF_SIZE + 1] = {0}; // Buffer para chunks de firmware
 
+static const char *TAG = "HTTP_SERVER";
+static char ota_write_data[OTA_BUF_SIZE + 1] = {0}; // Buffer para chunks de firmware
 static httpd_handle_t server = NULL;
 
-// Variable dummy para el estado de la alarma
-static bool alarm_on = false;
-
 // --- Notificar a todos los clientes WebSocket de /ws_alarm ---
-static void notify_alarm_ws_clients(void) {
+static void notify_alarm_ws_clients(const alarm_state_t* state) {
   if (!server)
     return;
 
-  // 1) Prepara el mensaje JSON
-  char msg[32];
-  snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+  // Prepara el mensaje JSON con el estado real
+  char msg[64];
+  snprintf(msg, sizeof(msg), "{\"system_state\":%d,\"active_zones\":%u,\"triggered_zones\":%u}",
+           state->system_state, state->active_zones, state->triggered_zones);
   httpd_ws_frame_t ws_pkt = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)msg, .len = strlen(msg)};
 
-  // 2) Obtén la lista de clientes
   size_t max_clients = CONFIG_LWIP_MAX_SOCKETS;
   int client_fds[CONFIG_LWIP_MAX_SOCKETS];
   esp_err_t err = httpd_get_client_list(server, &max_clients, client_fds);
@@ -39,7 +36,6 @@ static void notify_alarm_ws_clients(void) {
   }
   ESP_LOGI(TAG, "Enviando notificación a %u clientes", (unsigned)max_clients);
 
-  // 3) Recorre los fds reales y envía el frame
   for (size_t i = 0; i < max_clients; ++i) {
     err = httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
     if (err != ESP_OK) {
@@ -48,14 +44,9 @@ static void notify_alarm_ws_clients(void) {
   }
 }
 
-// Callback para actualizar alarm_on según el estado del sistema
-static void system_state_callback(const system_state_event_t *event) {
-  if (event->state != SYSTEM_STATE_DISARMED) {
-    alarm_on = true;
-  } else {
-    alarm_on = false;
-  }
-  notify_alarm_ws_clients();
+// Callback para alarm_manager
+static void alarm_state_changed_callback(const alarm_state_t* state) {
+  notify_alarm_ws_clients(state);
 }
 
 // --- Manejador para la carga del firmware OTA ---
@@ -246,16 +237,18 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    // Enviar estado inicial
-    char msg[32];
-    snprintf(msg, sizeof(msg), "{\"alarm\":\"%s\"}", alarm_on ? "on" : "off");
+    // Enviar estado inicial real
+    const alarm_state_t* state = alarm_manager_get_state();
+    char msg[64];
+    snprintf(msg, sizeof(msg), "{\"system_state\":%d,\"active_zones\":%u,\"triggered_zones\":%u}",
+             state->system_state, state->active_zones, state->triggered_zones);
     ws_pkt.payload = (uint8_t *)msg;
     ws_pkt.len = strlen(msg);
     httpd_ws_send_frame(req, &ws_pkt);
     return ESP_OK;
   }
 
-  // Recibir comandos
+  // Recibir comandos (ya no se soporta cambiar el estado desde el cliente)
   httpd_ws_frame_t ws_pkt;
   memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
   ws_pkt.type = HTTPD_WS_TYPE_TEXT;
@@ -269,7 +262,7 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
   if (ws_pkt.len > 128)
     return ESP_FAIL; // Limitar tamaño
 
-  // Leer frame
+  // Leer frame (pero ignorar comandos)
   uint8_t buf[128] = {0};
   ws_pkt.payload = buf;
   ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
@@ -279,17 +272,7 @@ static esp_err_t ws_alarm_handler(httpd_req_t *req) {
   }
   buf[ws_pkt.len] = 0;
 
-  // Procesar comando simple JSON: {"cmd":"on"} o {"cmd":"off"}
-  bool prev_alarm_on = alarm_on;
-  if (strstr((char *)buf, "\"cmd\":\"on\"")) {
-    alarm_on = true;
-  } else if (strstr((char *)buf, "\"cmd\":\"off\"")) {
-    alarm_on = false;
-  }
-  if (alarm_on != prev_alarm_on) {
-    notify_alarm_ws_clients();
-  }
-
+  // No modificar el estado de la alarma desde el cliente
   return ESP_OK;
 }
 
@@ -321,9 +304,8 @@ esp_err_t http_server_start(void) {
         .uri = "/ota_update", .method = HTTP_POST, .handler = ota_update_post_handler, .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ota_update_post);
 
-    // Registrar callback para cambios de estado del sistema
-    on_system_state(system_state_callback);
-
+    // Registrar callback para cambios de estado de la alarma
+    alarm_manager_on_state_changed(alarm_state_changed_callback);
     ESP_LOGI(TAG, "Servidor HTTP iniciado y handlers registrados.");
     return ESP_OK;
   }

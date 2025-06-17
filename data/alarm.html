@@ -15,6 +15,9 @@
         .on { background: #4caf50; color: #fff; }
         .off { background: #d32f2f; color: #fff; }
         #ws-status { font-size: 0.9em; color: #888; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; text-align: center; border: 1px solid #ddd; }
+        th { background: #f2f2f2; }
     </style>
 </head>
 <body>
@@ -24,6 +27,7 @@
         <button class="on" id="btn-on">Activar</button>
         <button class="off" id="btn-off">Desactivar</button>
         <div id="ws-status">Conectando...</div>
+        <div id="zones-container" style="margin-top:20px;"></div>
     </div>
     <script>
         const alarmStatus = document.getElementById('alarm-status');
@@ -33,14 +37,31 @@
 
         let ws;
 
-        function updateStatus(state) {
-            if (state === "on") {
-                alarmStatus.textContent = "Activada";
-                alarmStatus.className = "active";
-            } else {
-                alarmStatus.textContent = "Desactivada";
-                alarmStatus.className = "inactive";
+        function renderZones(active_zones, triggered_zones, num_zones = 8) {
+            let html = '<table style="width:100%;border-collapse:collapse;text-align:center;">';
+            html += '<tr><th>Zona</th><th>Activa</th><th>Disparada</th></tr>';
+            for (let i = 0; i < num_zones; ++i) {
+                const isActive = (active_zones >> i) & 1;
+                const isTriggered = (triggered_zones >> i) & 1;
+                html += `<tr><td>${i+1}</td><td style="color:${isActive?'#4caf50':'#888'}">${isActive?'Sí':'No'}</td><td style="color:${isTriggered?'#d32f2f':'#888'}">${isTriggered?'Sí':'No'}</td></tr>`;
             }
+            html += '</table>';
+            document.getElementById('zones-container').innerHTML = html;
+        }
+
+        function updateStatus(state, active_zones, triggered_zones) {
+            let stateText = "";
+            let stateClass = "inactive";
+            switch(state) {
+                case 0: stateText = "Desarmada"; stateClass = "inactive"; break;
+                case 1: stateText = "Armada"; stateClass = "active"; break;
+                case 2: stateText = "Armando"; stateClass = "active"; break;
+                case 3: stateText = "Armada (Stay)"; stateClass = "active"; break;
+                default: stateText = "Desconocido"; stateClass = "inactive";
+            }
+            alarmStatus.textContent = stateText;
+            alarmStatus.className = stateClass;
+            renderZones(active_zones, triggered_zones);
         }
 
         function connectWS() {
@@ -52,11 +73,11 @@
             };
 
             ws.onmessage = (event) => {
-                // Espera mensajes tipo: {"alarm":"on"} o {"alarm":"off"}
+                // Espera mensajes tipo: {"system_state":1,"active_zones":3,"triggered_zones":1}
                 try {
                     const data = JSON.parse(event.data);
-                    if (data.alarm) {
-                        updateStatus(data.alarm);
+                    if (typeof data.system_state !== 'undefined') {
+                        updateStatus(data.system_state, data.active_zones, data.triggered_zones);
                     }
                 } catch (e) {
                     wsStatus.textContent = "Error de datos recibidos";
@@ -74,14 +95,10 @@
         }
 
         btnOn.onclick = () => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({cmd: "on"}));
-            }
+            // Deshabilitado: el estado solo puede cambiarse desde el panel físico
         };
         btnOff.onclick = () => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({cmd: "off"}));
-            }
+            // Deshabilitado: el estado solo puede cambiarse desde el panel físico
         };
 
         connectWS();
