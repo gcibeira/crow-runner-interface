@@ -12,9 +12,6 @@
 #define UDP_LOGGING_IP   "192.168.100.11"
 #define UDP_LOGGING_PORT 5000
 
-#define DATA_PIN 23
-#define CLK_PIN 18
-
 static const char *TAG_MAIN = "APP_MAIN";
 
 void app_main(void) {
@@ -49,7 +46,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(http_server_start());
 
     // Initialize Alarm manager
-    ESP_ERROR_CHECK(alarm_manager_init(DATA_PIN, CLK_PIN));
+    ESP_ERROR_CHECK(alarm_manager_init());
 
     ESP_LOGI(TAG_MAIN, "System started and waiting for events...");
 }
