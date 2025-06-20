@@ -9,10 +9,10 @@ esp_err_t ws_alarm_handler(httpd_req_t *req) {
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    const alarm_state_t* state = alarm_manager_get_state();
+    const alarm_state_t *state = alarm_manager_get_state();
     char msg[64];
-    snprintf(msg, sizeof(msg), "{\"system_state\":%d,\"active_zones\":%u,\"triggered_zones\":%u}",
-             state->system_state, state->active_zones, state->triggered_zones);
+    snprintf(msg, sizeof(msg), "{\"system_state\":%d,\"active_zones\":%u,\"triggered_zones\":%u}", state->system_state,
+             state->active_zones, state->triggered_zones);
     ws_pkt.payload = (uint8_t *)msg;
     ws_pkt.len = strlen(msg);
     httpd_ws_send_frame(req, &ws_pkt);
@@ -40,5 +40,19 @@ esp_err_t ws_alarm_handler(httpd_req_t *req) {
   }
   buf[ws_pkt.len] = 0;
 
+  // Procesar comando recibido
+  ws_alarm_handle_command((const char *)buf);
+
   return ESP_OK;
+}
+
+// Procesa comandos recibidos por WebSocket (ej: activar/desactivar alarma)
+void ws_alarm_handle_command(const char *json) {
+  if (strstr(json, "\"command\"") && strstr(json, "\"activate_alarm\"")) {
+      alarm_manager_activate();
+  } else if (strstr(json, "\"command\"") && strstr(json, "\"deactivate_alarm\"")) {
+      alarm_manager_deactivate();
+      } else {
+    ESP_LOGW("WS_CMD", "Comando WebSocket desconocido o mal formado: %s", json);
+  }
 }
