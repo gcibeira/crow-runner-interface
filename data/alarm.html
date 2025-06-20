@@ -1,25 +1,88 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>Estado de la Alarma</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 400px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); padding: 30px; }
-        h1 { color: #0056b3; }
-        #alarm-status { font-size: 1.5em; margin: 20px 0; }
-        .active { color: #4caf50; }
-        .inactive { color: #d32f2f; }
-        button { margin: 10px 5px 0 0; padding: 10px 20px; font-size: 1em; border: none; border-radius: 4px; cursor: pointer; }
-        .on { background: #4caf50; color: #fff; }
-        .off { background: #d32f2f; color: #fff; }
-        #ws-status { font-size: 0.9em; color: #888; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; text-align: center; border: 1px solid #ddd; }
-        th { background: #f2f2f2; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #0056b3;
+        }
+
+        #alarm-status {
+            font-size: 1.5em;
+            margin: 20px 0;
+        }
+
+        .active {
+            color: #4caf50;
+        }
+
+        .inactive {
+            color: #d32f2f;
+        }
+
+        button {
+            margin: 10px 5px 0 0;
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .on {
+            background: #4caf50;
+            color: #fff;
+        }
+
+        .off {
+            background: #d32f2f;
+            color: #fff;
+        }
+
+        #ws-status {
+            font-size: 0.9em;
+            color: #888;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background: #f2f2f2;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Estado de la Alarma</h1>
@@ -43,7 +106,7 @@
             for (let i = 0; i < num_zones; ++i) {
                 const isActive = (active_zones >> i) & 1;
                 const isTriggered = (triggered_zones >> i) & 1;
-                html += `<tr><td>${i+1}</td><td style="color:${isActive?'#4caf50':'#888'}">${isActive?'Sí':'No'}</td><td style="color:${isTriggered?'#d32f2f':'#888'}">${isTriggered?'Sí':'No'}</td></tr>`;
+                html += `<tr><td>${i + 1}</td><td style="color:${isActive ? '#4caf50' : '#888'}">${isActive ? 'Sí' : 'No'}</td><td style="color:${isTriggered ? '#d32f2f' : '#888'}">${isTriggered ? 'Sí' : 'No'}</td></tr>`;
             }
             html += '</table>';
             document.getElementById('zones-container').innerHTML = html;
@@ -52,7 +115,7 @@
         function updateStatus(state, active_zones, triggered_zones) {
             let stateText = "";
             let stateClass = "inactive";
-            switch(state) {
+            switch (state) {
                 case 0: stateText = "Desarmada"; stateClass = "inactive"; break;
                 case 1: stateText = "Armada"; stateClass = "active"; break;
                 case 2: stateText = "Armando"; stateClass = "active"; break;
@@ -94,14 +157,24 @@
             };
         }
 
+        function sendCommand(cmd) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: cmd }));
+            } else {
+                console.warn("WebSocket no está listo:", ws.readyState);
+                wsStatus.textContent = "Desconectado";
+            }
+        }
+
         btnOn.onclick = () => {
-            // Deshabilitado: el estado solo puede cambiarse desde el panel físico
+            sendCommand("activate_alarm");
         };
         btnOff.onclick = () => {
-            // Deshabilitado: el estado solo puede cambiarse desde el panel físico
+            sendCommand("deactivate_alarm");
         };
 
         connectWS();
     </script>
 </body>
+
 </html>

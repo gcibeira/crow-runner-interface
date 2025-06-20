@@ -6,4 +6,7 @@
 
 esp_err_t ws_alarm_handler(httpd_req_t *req);
 
+// Procesa comandos recibidos por WebSocket (ej: activar/desactivar alarma)
+void ws_alarm_handle_command(const char* command);
+
 #endif // HTTP_SERVER_WS_ALARM_HANDLER_H
