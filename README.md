@@ -90,11 +90,13 @@ This project implements an ESP32-based interface to interact with Crow Runner al
    cd crow-runner-interface
    ```
 
-2. **Create WiFi credentials file**
-   Create the file `include/wifi_secrets.h` with the following content, replacing with your SSID and password:
+2. **Create credentials file**
+   Create the file `include/secrets.h` with the following content, replacing with your Wifi SSID and password, and alarm user code:
    ```c
    #define WIFI_SSID     "YourSSID"
    #define WIFI_PASSWORD "YourPassword"
+   #define ALARM_USER_CODE {1, 2, 3, 4}
+   #define ALARM_USER_CODE_LENGTH 4
    ```
 
 3. **Configure PlatformIO**

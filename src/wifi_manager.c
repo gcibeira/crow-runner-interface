@@ -5,7 +5,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "wifi_secrets.h"
+#include "secrets.h"
 
 #define WIFI_MAXIMUM_RETRY 5
 
