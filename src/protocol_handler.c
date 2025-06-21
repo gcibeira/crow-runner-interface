@@ -6,10 +6,11 @@ static system_state_event_callback_t system_state_callback = NULL;
 static zone_activity_event_callback_t zone_activity_callback = NULL;
 
 static void dispatch_event(protocol_event_t *event) {
-  // Llamar siempre a protocol_event_callback si está definido
+  // Generic callback for all protocol events
   if (protocol_event_callback) {
     protocol_event_callback(event);
   }
+  // Specific callbacks for each event type
   switch (event->type) {
     case PROTO_EVT_KEYPAD:
       if (keypad_callback) {

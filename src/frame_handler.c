@@ -20,7 +20,7 @@ static volatile size_t tx_idx;
 
 static void prepare_bitstream(const frame_t *frame, uint8_t *out_buffer, size_t *out_bits) {
   if (!frame || !out_buffer || !out_bits) {
-    ESP_LOGE(TAG, "prepare_bitstream: parámetros inválidos");
+    ESP_LOGE(TAG, "prepare_bitstream: invalid parameters");
     return;
   }
 
@@ -129,7 +129,7 @@ static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
     uint8_t incoming_byte = isr_accumulated_byte;
     isr_accumulated_byte = 0;
     isr_bit_count = 0;
-    if (current_frame.length < FRAME_BUFFER_SIZE)
+    if (current_frame.length < RX_FRAME_BUFFER_SIZE)
       current_frame.data[current_frame.length++] = incoming_byte;
     else
       inside_frame = false;
@@ -168,7 +168,7 @@ static void frame_processor_task(void *arg) {
 
 static void frame_sender_task(void *arg) {
   frame_t frame;
-  uint8_t bit_buf[MAX_BITSTREAM_BITS];
+  uint8_t bit_buf[TX_BITSTREAM_SIZE];
   size_t total_bits;
 
   while (true) {
@@ -238,13 +238,13 @@ esp_err_t frame_handler_init() {
     return ESP_FAIL;
   }
 
-  rx_frame_queue = xQueueCreate(FRAME_QUEUE_LENGTH, sizeof(frame_t));
+  rx_frame_queue = xQueueCreate(RX_FRAME_QUEUE_LENGTH, sizeof(frame_t));
   if (rx_frame_queue == NULL) {
     ESP_LOGE(TAG, "Could not create rx frame_queue");
     return ESP_ERR_NO_MEM;
   }
 
-  tx_frame_queue = xQueueCreate(FRAME_QUEUE_LENGTH, sizeof(frame_t));
+  tx_frame_queue = xQueueCreate(RX_FRAME_QUEUE_LENGTH, sizeof(frame_t));
   if (tx_frame_queue == NULL) {
     ESP_LOGE(TAG, "Could not create tx frame_queue");
     return ESP_ERR_NO_MEM;
