@@ -13,7 +13,7 @@ static const char *TAG = "FRAME_HANDLER";
 static QueueHandle_t rx_frame_queue;
 static QueueHandle_t tx_frame_queue;
 static SemaphoreHandle_t tx_done_sem;
-static volatile bool comm_in_progress;
+static SemaphoreHandle_t bus_free_sem;
 static volatile const uint8_t *tx_bits;
 static volatile size_t tx_len;
 static volatile size_t tx_idx;
@@ -78,11 +78,12 @@ static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
       consecutive_ones++;
     else {
       inside_frame = false;
-      comm_in_progress = false;
+      BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+      xSemaphoreGiveFromISR(bus_free_sem, &xHigherPriorityTaskWoken);
+      if (xHigherPriorityTaskWoken)
+        portYIELD_FROM_ISR();
     }
   } else {
-    if (!inside_frame)
-      comm_in_progress = true;
     // Stuffed bit detected
     if (consecutive_ones == 5) {
       consecutive_ones = 0;
@@ -97,7 +98,6 @@ static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
         xQueueSendFromISR(rx_frame_queue, (const void *)&current_frame, &xHigherPriorityTaskWoken);
         if (xHigherPriorityTaskWoken)
           portYIELD_FROM_ISR();
-        comm_in_progress = false;
       }
 
       inside_frame = !inside_frame;
@@ -107,6 +107,13 @@ static void IRAM_ATTR frame_process_bit(uint8_t incoming_bit) {
       current_frame.length = 0;
       return;
     }
+    if (!inside_frame) {
+      BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+      xSemaphoreTakeFromISR(bus_free_sem, &xHigherPriorityTaskWoken);
+      if (xHigherPriorityTaskWoken)
+        portYIELD_FROM_ISR();
+    }
+    
     consecutive_ones = 0;
   }
 
@@ -140,7 +147,7 @@ static void IRAM_ATTR clk_tx_isr_handler(void *arg) {
     tx_idx++;
   } else {
     gpio_set_level(DAT_TX_PIN, DAT_IDLE_LEVEL);
-    // Notificar a la tarea que la transmisión acabó
+    // Notify that transmission is done
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(tx_done_sem, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
@@ -167,8 +174,9 @@ static void frame_sender_task(void *arg) {
   while (true) {
     if (xQueueReceive(tx_frame_queue, &frame, portMAX_DELAY) == pdPASS) {
       prepare_bitstream(&frame, bit_buf, &total_bits);
-      while (comm_in_progress)
-        vTaskDelay(pdMS_TO_TICKS(1));
+
+      // Wait for bus to be free and switch to TX mode
+      xSemaphoreTake(bus_free_sem, portMAX_DELAY);
       gpio_isr_handler_remove(CLK_PIN);
       tx_bits = bit_buf;
       tx_len = total_bits;
@@ -176,12 +184,12 @@ static void frame_sender_task(void *arg) {
       gpio_set_intr_type(CLK_PIN, GPIO_INTR_POSEDGE);
       gpio_isr_handler_add(CLK_PIN, clk_tx_isr_handler, NULL);
 
-      // Bloquear tarea hasta fin de transmisión
+      // Wait for transmission to be complete and switch back to RX mode
       xSemaphoreTake(tx_done_sem, portMAX_DELAY);
       gpio_isr_handler_remove(CLK_PIN);
       gpio_set_intr_type(CLK_PIN, GPIO_INTR_NEGEDGE);
       gpio_isr_handler_add(CLK_PIN, clk_rx_isr_handler, NULL);
-      vTaskDelay(pdMS_TO_TICKS(100));
+      vTaskDelay(pdMS_TO_TICKS(TIME_BETWEEN_FRAMES_MS));
     }
   }
 }
@@ -245,6 +253,12 @@ esp_err_t frame_handler_init() {
   tx_done_sem = xSemaphoreCreateBinary();
   if (tx_done_sem == NULL) {
     ESP_LOGE(TAG, "Could not create tx_done semaphore");
+    return ESP_ERR_NO_MEM;
+  }
+
+  bus_free_sem = xSemaphoreCreateBinary();
+  if (bus_free_sem == NULL) {
+    ESP_LOGE(TAG, "Could not create bus_free semaphore");
     return ESP_ERR_NO_MEM;
   }
 

@@ -11,6 +11,7 @@
 #define DAT_TX_PIN 19
 #define CLK_PIN 18
 #define DAT_IDLE_LEVEL 0
+#define TIME_BETWEEN_FRAMES_MS 250
 
 typedef struct {
   uint8_t data[FRAME_BUFFER_SIZE];
